@@ -1,3 +1,5 @@
 bleak==0.21.1
 pybluez==0.23
 pycryptodome==3.19.0
+pytest==8.3.4
+pytest-asyncio==0.24.0

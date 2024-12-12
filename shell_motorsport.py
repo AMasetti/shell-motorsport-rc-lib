@@ -41,7 +41,7 @@ class ShellMotorsportCar:
                     for right in [0, 1]:
                         for turbo in [False, True]:
                             key = f"{forward}{backward}{left}{right}{turbo}"
-                            self.messages[key] = self._create_message(
+                            self.command_list[key] = self._create_message(
                                 forward, backward, left, right, turbo
                             )
 
