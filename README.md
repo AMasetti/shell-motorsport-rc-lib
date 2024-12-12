@@ -6,6 +6,15 @@ Esta librería permite controlar los autos de radio control (RC) de Shell Motors
 
 ## Instalación
 
+Opción 1: Via PIP
+
+```shell
+pip install git+https://github.com/AMasetti/shell-motorsport-rc-lib
+```
+
+
+Opción 2: Clonar el Repo
+
 1. Clona este repositorio:
     ```shell
     git clone
