@@ -32,8 +32,11 @@ Opción 2: Clonar el Repo
 
 Asegúrate de tener instalados los paquetes bleak y pycryptodome para manejar las conexiones BLE y la encriptación AES.
 
-## Uso con `main.py`
-El archivo `main.py` es un ejemplo de cómo utilizar la librería para controlar tu auto RC.
+
+## Uso con main.py
+
+El archivo main.py es un ejemplo de cómo utilizar la librería para controlar tu auto RC.
+
 ```python
 import asyncio
 from shell_motorsport import ShellMotorsportCar

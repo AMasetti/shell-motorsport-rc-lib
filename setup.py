@@ -2,8 +2,10 @@ from setuptools import setup, find_packages
 
 setup(
     name="shell_motorsport",
-    version="0.1.0",
+    version="0.1.1",
     description="Control de Autos RC de Shell Motorsport a través de Bluetooth Low Energy (BLE)",
+    long_description=open("README.md").read(),
+    long_description_content_type="text/markdown",
     author="Augusto Masetti",
     author_email="augmas15@gmail.com",
     url="https://github.com/AMasetti/shell-motorsport-rc-lib",

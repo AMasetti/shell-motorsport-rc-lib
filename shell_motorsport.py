@@ -7,6 +7,7 @@ from pathlib import Path
 
 logging.basicConfig(level=logging.INFO)
 
+
 class ShellMotorsportCar:
     SERVICE_UUID = "fff0"
     WRITE_CHAR_UUID = "d44bc439-abfd-45a2-b575-925416129600"
@@ -18,9 +19,12 @@ class ShellMotorsportCar:
     IDLE_MESSAGE = bytes.fromhex("e1055f54d880f49c2ce547267f930bf2")
 
     def __init__(self):
+        """Initialize the ShellMotorsportCar class."""
         self.client = None
         self.device = None
         self.vehicle_list_file = Path("vehicle_list.json")
+        with open(self.vehicle_list_file, "r") as file:
+            self.vehicle_list = json.load(file)
         self.load_messages_from_file()
 
     def load_messages_from_file(self, filename="car_commands.json"):
@@ -34,7 +38,7 @@ class ShellMotorsportCar:
             json.dump(self.command_list, file)
 
     def precompute_messages(self):
-        """Precomputes messages for various control states."""
+        """Precomputes messages for various control states"""
         for forward in [0, 1]:
             for backward in [0, 1]:
                 for left in [0, 1]:
@@ -55,6 +59,7 @@ class ShellMotorsportCar:
         with open(self.vehicle_list_file, "w") as file:
             json.dump(vehicle_list, file)
         logging.info(f"Saved car info: {car_name} -> {device_id}")
+        return vehicle_list
 
     def get_device_id(self, car_name: str) -> str:
         """Retrieve device_id from the JSON file given a car name."""
@@ -70,10 +75,11 @@ class ShellMotorsportCar:
         devices = await BleakScanner.discover()
         for device in devices:
             try:
-                self.device = device
-                logging.info(f"Found RC Car: {device.name} ({device.address})")
-                self.save_vehicle_list(new_name, device.name)
-                return device
+                if "QCAR" in device.name:
+                    self.device = device
+                    logging.info(f"Found RC Car: {device.name} ({device.address})")
+                    self.vehicle_list = self.save_vehicle_list(new_name, device.name)
+                    return device
             except Exception as e:
                 logging.error("Error finding RC Car: %s", e)
                 logging.info("RC Car not found. Make sure it is powered on and in range.")
@@ -148,7 +154,8 @@ class ShellMotorsportCar:
     def retreive_precomputed_message(self, forward: int = 0, backward: int = 0, left: int = 0, right: int = 0, drs: int = 0x50) -> bytes:
         """Retrieve a precomputed message from the list."""
         key = f"{forward}{backward}{left}{right}{drs}"
-        return self.command_list.get(key, self.IDLE_MESSAGE)
+        # return self.command_list.get(key, self.IDLE_MESSAGE)
+        return self._create_message(forward, backward, left, right, drs)
 
     async def move_command(self, message: bytes):
         """Send a control message to the car."""
