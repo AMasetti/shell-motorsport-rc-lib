@@ -123,6 +123,45 @@ La librería permite controlar múltiples autos RC simultáneamente:
 
 3. Utiliza las funciones de movimiento para controlar cada auto de forma independiente.
 
+## Soporte para JoyCon
+
+![JoyCon](img/joycon_buttons.png)
+
+La librería ahora soporta control de los autos RC utilizando los controladores JoyCon de Nintendo. Puedes controlar múltiples autos simultáneamente usando los JoyCon Plus y Minus.
+
+### Instalación de Dependencias Adicionales
+
+Asegúrate de instalar `pyjoycon` para manejar la conexión con los JoyCon:
+
+```shell
+pip install joycon-python hidapi pyglm
+```
+
+### Uso con `main_joycon.py`
+
+El archivo `main_joycon.py` proporciona un ejemplo de cómo utilizar los JoyCon para controlar varios autos RC.
+
+```python
+import asyncio
+from shell_motorsport import ShellMotorsportCar
+from pyjoycon import JoyCon, get_R_id, get_L_id
+
+# ...existing code...
+```
+
+## Selección de Velocidad
+
+Puedes seleccionar diferentes niveles de velocidad para tu auto RC utilizando los botones del JoyCon. Las velocidades predefinidas son:
+
+- **0x16**: Velocidad baja
+- **0x32**: Velocidad media
+- **0x48**: Velocidad alta
+- **0x64**: Velocidad máxima
+
+### Personalización de Velocidad
+
+Modifica las condiciones en `get_joycon_command` dentro de `shell_motorsport.py` para ajustar las velocidades según tus necesidades.
+
 ## Funcionamiento del protocolo de comunicación
 Los autos RC de Shell utilizan Bluetooth Low Energy (BLE) para comunicarse. La librería maneja el protocolo de comunicación que incluye:
 

@@ -1,4 +1,6 @@
+from abc import ABC, abstractmethod
 import asyncio
+import base64
 import logging
 import json
 from bleak import BleakClient, BleakScanner
@@ -8,15 +10,34 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO)
 
 
-class ShellMotorsportCar:
+class Controller(ABC):
+    @abstractmethod
+    async def connect(self, device_id: str):
+        '''Connect to the RC car'''
+        pass
+
+    @abstractmethod
+    async def disconnect(self):
+        '''Disconnect from the RC car'''
+        pass
+
+    @abstractmethod
+    async def move_command(self, message: bytes):
+        '''Send a control message to the car'''
+        pass
+
+    @abstractmethod
+    async def stop(self):
+        '''Command the car to stop'''
+        pass
+
+class ShellMotorsportCar(Controller):
     SERVICE_UUID = "fff0"
     WRITE_CHAR_UUID = "d44bc439-abfd-45a2-b575-925416129600"
     NOTIFY_CHAR_UUID = "d44bc439-abfd-45a2-b575-925416129601"
     AES_KEY = bytes.fromhex("34522a5b7a6e492c08090a9d8d2a23f8")
-    CONTROL_PREFIX = b"CTL"
-    SPEED_NORMAL = b"50"
-
     IDLE_MESSAGE = bytes.fromhex("e1055f54d880f49c2ce547267f930bf2")
+    CONTROL_PREFIX = b"CTL"
 
     def __init__(self):
         """Initialize the ShellMotorsportCar class."""
@@ -25,6 +46,8 @@ class ShellMotorsportCar:
         self.vehicle_list_file = Path("vehicle_list.json")
         with open(self.vehicle_list_file, "r") as file:
             self.vehicle_list = json.load(file)
+        self.command_list = {}
+        self.speed = 0x50
         self.load_messages_from_file()
 
     def load_messages_from_file(self, filename="car_commands.json"):
@@ -43,11 +66,9 @@ class ShellMotorsportCar:
             for backward in [0, 1]:
                 for left in [0, 1]:
                     for right in [0, 1]:
-                        for turbo in [False, True]:
-                            key = f"{forward}{backward}{left}{right}{turbo}"
-                            self.command_list[key] = self._create_message(
-                                forward, backward, left, right, turbo
-                            )
+                        for speed in [0x16, 0x32, 0x48, 0x64]:
+                            key = f"{forward}{backward}{left}{right}{speed}"
+                            self.command_list[key] = base64.b64encode(self._create_message(forward, backward, left, right, speed)).decode('utf-8')
 
     def save_vehicle_list(self, car_name: str, device_id: str):
         """Save car name and device_id to a JSON file."""
@@ -137,7 +158,7 @@ class ShellMotorsportCar:
         cipher = AES.new(self.AES_KEY, AES.MODE_ECB)
         return cipher.encrypt(message)
 
-    def _create_message(self, forward: int = 0, backward: int = 0, left: int = 0, right: int = 0, drs: int = 0x50) -> bytes:
+    def _create_message(self, forward: int = 0, backward: int = 0, left: int = 0, right: int = 0, speed: int = 0x50) -> bytes:
         """Create a control message to send to the car."""
         message = bytearray(16)
         message[0] = 0  # Unknown
@@ -147,15 +168,15 @@ class ShellMotorsportCar:
         message[6] = left
         message[7] = right
         message[8] = 0
-        message[9] = 0x64 if drs else 0x50
+        message[9] = speed
+        # message[9] = 0x64 if drs else 0x50
         message = bytes(message)
         return self._encrypt_message(message)
 
-    def retreive_precomputed_message(self, forward: int = 0, backward: int = 0, left: int = 0, right: int = 0, drs: int = 0x50) -> bytes:
+    def retreive_precomputed_message(self, forward: int = 0, backward: int = 0, left: int = 0, right: int = 0, speed: int = 0x50) -> bytes:
         """Retrieve a precomputed message from the list."""
-        key = f"{forward}{backward}{left}{right}{drs}"
-        # return self.command_list.get(key, self.IDLE_MESSAGE)
-        return self._create_message(forward, backward, left, right, drs)
+        key = f"{forward}{backward}{left}{right}{speed}"
+        return base64.b64decode(self.command_list.get(key, self.IDLE_MESSAGE))
 
     async def move_command(self, message: bytes):
         """Send a control message to the car."""
@@ -168,4 +189,39 @@ class ShellMotorsportCar:
         if not self.client or not self.client.is_connected:
             raise Exception("Not connected to the car.")
         await self.client.write_gatt_char(self.WRITE_CHAR_UUID, self.IDLE_MESSAGE)
-        logging.info("Car stopped.")
+
+    def get_joycon_command(self, status:dict, device_type: str = "Plus") -> bytes:
+        """Get a control message from a JoyCon controller."""
+        try:
+            if device_type == "Plus":
+                forward = 1 if status['buttons']['right']['sr'] else 0
+                backward = 1 if status['buttons']['right']['sl'] else 0
+                left = 1 if status['analogs']['right']['y'] < 0 else 0
+                right = 1 if status['analogs']['right']['y'] > 0 else 0
+                if status['buttons']['right']['a']:
+                    self.speed = 0x16
+                elif status['buttons']['right']['b']:
+                    self.speed = 0x32
+                elif status['buttons']['right']['y']:
+                    self.speed = 0x48
+                elif status['buttons']['right']['x']:
+                    self.speed = 0x64
+            elif device_type == "Minus":
+                forward = 1 if status['buttons']['left']['sr'] else 0
+                backward = 1 if status['buttons']['left']['sl'] else 0
+                left = 1 if status['analogs']['left']['y'] < 0 else 0
+                right = 1 if status['analogs']['left']['y'] > 0 else 0
+                if status['buttons']['left']['left']:
+                    self.speed = 0x16
+                elif status['buttons']['left']['down']:
+                    self.speed = 0x32
+                elif status['buttons']['left']['right']:
+                    self.speed = 0x48
+                elif status['buttons']['left']['up']:
+                    self.speed = 0x64
+        except Exception as e:
+            logging.error("Error getting JoyCon command: %s", e)
+            return self.IDLE_MESSAGE
+
+        return self.retreive_precomputed_message(forward, backward, left, right, self.speed)
+
