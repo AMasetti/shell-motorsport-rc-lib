@@ -39,5 +39,5 @@ MAX_SCAN_RETRIES: int = 5
 SCAN_RETRY_DELAY: float = 2.0  # seconds
 
 # JoyCon settings
-JOYCON_DEADZONE: float = 0.1  # Analog stick deadzone threshold
+JOYCON_DEADZONE: float = 0.02  # Analog stick deadzone threshold (2% to allow small movements)
 

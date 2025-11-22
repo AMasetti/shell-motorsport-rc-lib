@@ -324,14 +324,18 @@ class ShellMotorsportCar(Controller):
 
         if encoded_message:
             try:
-                return base64.b64decode(encoded_message)
+                message = base64.b64decode(encoded_message)
+                logger.debug(f"[MESSAGE DEBUG] Retrieved precomputed message for key: {key}")
+                return message
             except Exception as e:
                 logger.warning(f"Error decoding precomputed message: {e}")
                 return IDLE_MESSAGE
 
         # Fallback to creating message on the fly
         logger.debug(f"Precomputed message not found for key {key}, creating new one")
-        return self._create_message(forward, backward, left, right, speed)
+        message = self._create_message(forward, backward, left, right, speed)
+        logger.debug(f"[MESSAGE DEBUG] Created new message for key: {key}")
+        return message
 
     async def find_and_name_car(self, new_name: str) -> BLEDevice:
         """
@@ -493,7 +497,7 @@ class ShellMotorsportCar(Controller):
             await self.move_command(message)
 
     def get_joycon_command(
-        self, status: Dict, device_type: str = "Plus", current_speed: int = DEFAULT_SPEED
+        self, status: Dict, device_type: str = "Plus", current_speed: int = DEFAULT_SPEED, rotated: bool = False
     ) -> bytes:
         """
         Get a control message from JoyCon controller input.
@@ -502,16 +506,37 @@ class ShellMotorsportCar(Controller):
             status: JoyCon status dictionary from pyjoycon
             device_type: "Plus" or "Minus"
             current_speed: Current speed setting (used if no speed button pressed)
+            rotated: Whether the JoyCon is rotated (single controller mode).
+                    When True, uses y-axis as horizontal steering axis.
 
         Returns:
             Encrypted control message bytes
         """
-        forward, backward, left, right, speed = self.joycon_handler.parse_joycon_status(
-            status, device_type, current_speed
-        )
-        return self.retrieve_precomputed_message(
-            forward=forward, backward=backward, left=left, right=right, speed=speed
-        )
+        try:
+            forward, backward, left, right, speed = self.joycon_handler.parse_joycon_status(
+                status, device_type, current_speed, rotated
+            )
+
+            # Log command generation for debugging
+            if forward or backward or left or right:
+                logger.info(
+                    f"[COMMAND DEBUG] Generating command: "
+                    f"forward={forward}, backward={backward}, left={left}, right={right}, speed=0x{speed:02x}"
+                )
+
+            message = self.retrieve_precomputed_message(
+                forward=forward, backward=backward, left=left, right=right, speed=speed
+            )
+
+            # Verify message was retrieved/created correctly
+            if len(message) != 16:
+                logger.error(f"[ERROR] Invalid message length: {len(message)} bytes (expected 16)")
+
+            return message
+        except Exception as e:
+            logger.error(f"[ERROR] Failed to generate JoyCon command: {e}", exc_info=True)
+            # Return idle message on error
+            return IDLE_MESSAGE
 
     # Async context manager support
     async def __aenter__(self):
